@@ -1,26 +1,57 @@
-import msvcrt
+import sys
 from datetime import datetime
 
+# Impor modul yang sesuai dengan sistem operasi
+if sys.platform == 'win32':
+    import msvcrt
+else:
+    import termios
+    import tty
+
 def get_masked_input(prompt=""):
-    """Helper function to read input and display asterisks (*) in the terminal."""
+    """Helper function to read input and display asterisks (*) cross-platform (Windows & macOS/Linux)."""
     print(prompt, end="", flush=True)
     chars = []
-    while True:
-        key = msvcrt.getch()
-        if key in {b'\r', b'\n'}:
-            print()
-            break
-        elif key == b'\x08':
-            if chars:
-                chars.pop()
-                print('\b \b', end='', flush=True)
-        else:
-            try:
-                char_str = key.decode('utf-8')
-                chars.append(char_str)
-                print('*', end='', flush=True)
-            except UnicodeDecodeError:
-                pass
+    
+    if sys.platform == 'win32':
+        while True:
+            key = msvcrt.getch()
+            if key in {b'\r', b'\n'}:
+                print()
+                break
+            elif key == b'\x08':  # Backspace on Windows
+                if chars:
+                    chars.pop()
+                    print('\b \b', end='', flush=True)
+            else:
+                try:
+                    char_str = key.decode('utf-8')
+                    chars.append(char_str)
+                    print('*', end='', flush=True)
+                except UnicodeDecodeError:
+                    pass
+    else:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            while True:
+                ch = sys.stdin.read(1)
+                if ch in ('\r', '\n'):
+                    print('\r\n', end='', flush=True)
+                    break
+                elif ch in ('\x7f', '\b'):  # Backspace on macOS/Linux
+                    if chars:
+                        chars.pop()
+                        print('\b \b', end='', flush=True)
+                elif ch == '\x03':  # Ctrl+C handling
+                    raise KeyboardInterrupt
+                else:
+                    chars.append(ch)
+                    print('*', end='', flush=True)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            
     return "".join(chars)
 
 class BankAccount:
